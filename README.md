@@ -1,2 +1,4 @@
 # Measurement-Data-Visualization
-Elective Course at Fordham MSSD program 
+
+This is assignment for elective course at Fordham MSSD program.
+
