@@ -1,0 +1,237 @@
+---
+title: "How People Regards of Their Time in Children Caring"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    runtime: shiny
+---
+
+> Data source: CIA World Factbook (2017-01-10)
+
+```{r setup, include=FALSE}
+
+## IMPORT DATA & LIBRARY
+library(flexdashboard)
+require(tidyverse)
+require(gridExtra)
+require(readxl)
+require(usmap)
+require(tidycensus)
+require(foreign) 
+require(survey) 
+require(readxl) 
+require(rvest)
+
+theme.info <- theme(plot.title = element_text(size=14, hjust=0.5),
+                    axis.title = element_text(size=12),
+                    axis.text=element_text(size=10)) 
+
+total_participating <- read_excel("SeriesReport-20191128134937_8b2332.xlsx", skip=12)
+man_participating <- read_excel("SeriesReport-20191128134958_5a9041.xlsx", skip=13)
+woman_participating <- read_excel("SeriesReport-20191128135003_ca24da.xlsx", skip=12)
+pew.data <- read.spss("Sep15 Parenting_clean.sav", to.data.frame=TRUE)
+young_pop_pect_new <- read_csv("young_pop_pect.csv")
+young_pop_pect_new$`Rank(total)`<-as.character(young_pop_pect_new$`Rank(total)`)
+
+## Countries should be listed in the dropdown menu in alphabetical order.
+young_pop_pect_new <-young_pop_pect_new[order(young_pop_pect_new$Country),]
+
+
+## Since IP would be blocked, I save all data from this website to xlsx for using
+
+# read_htlm() reads a webpage:
+
+#young_population_percentage <- read_html("http://world.bymap.org/YoungPopulation.html")
+#is.list(html_nodes(young_population_percentage, "table"))
+#html_nodes(young_population_percentage, "table")[[1]]
+#html_table(html_nodes(young_population_percentage, "table")[[1]], fill=TRUE)
+# putting everything together:
+#young_pop_pect <-  html_table(html_nodes(young_population_percentage, "table")[[1]], fill=TRUE)
+#write.table (young_pop_pect, file ="young_pop_pect.xlsx", sep ="", row.names =FALSE, col.names =TRUE)
+
+young_pop_pect_new <- young_pop_pect_new %>%
+        rename("Young Generation Population Percentage" = `Total (percent)`,
+               "Rank in Word" = `Rank(total)`) %>%
+        select("Country","Young Generation Population Percentage","Rank in Word")
+
+
+
+    
+```
+
+
+Row {data-height=600}
+-----------------------------------------------------------------------
+ 
+
+### {data-width=300}
+
+Young Population (age under 15) Percentage of all Country in the World (2016)
+```{r}
+
+## Rename Rows
+country.name <- young_pop_pect_new$Country
+country.rank <- young_pop_pect_new$`Rank(total)`
+country.percent <- young_pop_pect_new$`Total (percent)`
+
+selectInput("Country", 
+        label = "Choose a Country to display",
+        choices = country.name,
+        selected = "China")
+
+## Out put table
+       
+renderTable(young_pop_pect_new%>%filter(country.name == input$Country))
+    
+
+```
+
+
+
+
+
+-----------------------------------------------------------------------
+
+### How People Regards of Their Time in Children Caring from Princeton Survey Research Associates at USA (2015) {data-width=400}
+
+
+```{r}
+
+
+## transfer data into tibble
+
+pew.data <- as_tibble(pew.data) 
+
+## setting up the survey design 
+
+pew.design <- svydesign(ids=~1, 
+                        weights=pew.data$utweight, 
+                        data=pew.data)
+# preparing data
+time_allocation<-data.frame(round(svymean(~q12, design=pew.design), digits = 3))
+# time_allocation
+
+table5<-data.frame(time_allocation$mean)
+row.names(table5) <- c("Too Much","Too Little","Right Amount","Don't know/Refused (VOL.)")
+
+
+table5 <- table5 %>%
+  as_tibble(rownames="response")
+
+table5$response = factor(table5$response, levels=c("Right Amount","Too Little","Too Much","Don't know/Refused (VOL.)"))
+
+
+## Bar Plot of Survey Result
+
+table5 %>%
+  mutate(
+         percent = time_allocation.mean*100) %>%
+  ggplot(aes(x=response, y=percent)) +
+  geom_col(fill=c("paleturquoise4", "paleturquoise4", "paleturquoise4","paleturquoise4")) +
+  ggtitle("How People Regards of Their Time in Children Caring") +
+  labs(x="", y = "percent (%)")+
+  theme(axis.text.x = element_text(angle = 30,hjust = 1,vjust = 1))+
+  theme.info
+
+
+
+
+```
+
+> Data source: PEW RESEARCH CENTER; 2015 PARENTING SURVEY;Princeton Survey Research Associates International
+> Note: (VOL.) for VOICEMAIL MESSAGE (LEAVE ONLY ONCE -- THE FIRST TIME A CALL GOES TO VOICEMAIL)
+
+
+Row {data-height=600}
+-----------------------------------------------------------------------
+### {data-width=150}
+
+```{r}
+
+## Select Input button 
+## Four options for selection
+
+selectInput("varible", 
+        label = "Choose a category to display",
+        choices = c("Women and Men Combined" ="Total", "Men"="Man",
+          "Women"="Woman","All Category"="All"),
+        selected = "Total")
+
+
+```
+
+### Participating Percentage from 2007 to 2018 of USA {data-width=500}
+
+```{r}
+
+##  plot time series graph to the dashboard
+renderPlot(
+  if(input$varible == "Total"){
+    
+    total_participating %>% 
+    ggplot(aes(x=Year, y=Estimate)) +
+    geom_line() +
+    geom_point() +
+    ggtitle("Percent of Population Engaged in Activity (Caring for and helping household children under 18) on an Average Day") +
+    scale_x_continuous(breaks =seq(2007, 2018, by=1), labels=seq(2007, 2018, by=1))+
+    labs(y="Percentage") +
+    theme.info
+
+  }else if(input$varible == "Man"){
+    
+    man_participating %>% 
+    ggplot(aes(x=Year, y=Estimate)) +
+    geom_line() +
+    geom_point() +
+    ggtitle("Percent of Population Engaged in Activity (Caring for and helping household children under 18) on an Average Day (Man)") +
+    scale_x_continuous(breaks =seq(2007, 2018, by=1), labels=seq(2007, 2018, by=1))+
+    labs(y="Percentage") +
+    theme.info
+  }else if(input$varible == "Woman"){
+    
+    woman_participating %>% 
+    ggplot(aes(x=Year, y=Estimate)) +
+    geom_line() +
+    geom_point() +
+    ggtitle("Percent of Population Engaged in Activit (Caring for and helping household children under 18) on an Average Day (Woman)") +
+    scale_x_continuous(breaks =seq(2007, 2018, by=1), labels=seq(2007, 2018, by=1))+
+    labs(y="Percentage") +
+    theme.info
+
+  }else{
+
+    total_data <- left_join(total_participating,man_participating , by="Year")
+    total_data <- left_join(total_data, woman_participating,by="Year")
+    total_data <- total_data %>%
+    rename(Total = `Estimate.x`,
+         Men = `Estimate.y`,
+         Women = `Estimate`)
+
+
+    total_data %>% 
+  ggplot() +
+  geom_line(aes(x = Year,y = Total,colour = "Total")) +
+  geom_line(aes(x = Year,y = Women,colour = "Women"))+
+  geom_line(aes(x = Year,y = Men,colour = "Men"))+
+  geom_point(aes(x = Year,y = Total,colour = "Total")) +
+  geom_point(aes(x = Year,y = Women,colour = "Women"))+
+  geom_point(aes(x = Year,y = Men,colour = "Men"))+
+  ggtitle("Percent of Population Engaged in Activity (Caring for and helping household children under 18) on an Average Day ") +
+  scale_x_continuous(breaks =seq(2007, 2018, by=1), labels=seq(2007, 2018, by=1))+
+  labs(y="Percentage") +
+      guides(color=guide_legend(title=NULL)) +
+  theme.info
+  }
+    ) # end line code
+
+```
+
+> Data source: American Time Use; Percent of population engaged in activity on an average day (2008 to 2018)
+
+
+
+
+
+
+
