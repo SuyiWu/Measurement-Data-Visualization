@@ -1,0 +1,287 @@
+---
+title: "Assignment_2_Ywu336"
+author: "Yuwen Wu(336)"
+date: "11/4/2019"
+output: word_document
+---
+
+
+**1. Description of Data Sources**
+
+Source 1: Data "ATP W32.sav" is downloaded from Pew Research Center. This data is based on the questionnaire related to personal life such as whether you are happiness in career and family life, which is under the section of Global Attitute and Trends. From the Pew Research Center, this data is collected from the 32nd The American Trends Panel (ATP) panel survey.The American Trends Panel (ATP) is a national, probability-based online panel of adults living in households in the United States living(Pew Research Center’s American Trends Panel Wave 32 Methodology Report). In the ATP, they collected this survey data from 4,734 ATP members and 1,517 KP members. 
+
+Source 2: We are using 2017 1-year estimates from the American Community Survey which helps local officials, community leaders, and businesses understand the changes taking place in their communities. (https://factfinder.census.gov/faces/tableservices/jsf/pages/productview.xhtml?pid=ACS_17_5YR_DP03&prodType=table).The Employment and unemployment estimates data is from the official labor force data released by the Bureau of Labor Statistics.
+
+
+**2.  Measures of Uncertainty**
+
+From the Data source 1, We use the first and third question in this survey.
+
+Your family life	
+
+1	Very satisfied
+2	Somewhat satisfied 
+3	Somewhat dissatisfied
+4	Very dissatisfied
+
+Your personal financial situation 
+
+1	Very satisfied
+2	Somewhat satisfied 
+3	Somewhat dissatisfied
+4	Very dissatisfied
+
+```{r,include = FALSE, echo=FALSE,warning = FALSE,error = FALSE,message = FALSE}
+
+## Data Source 1
+
+## loading library
+require(tidyverse)
+require(gridExtra)
+require(ggmosaic) 
+require(foreign) 
+require(survey) 
+require(kableExtra)
+
+
+theme.info <- theme(plot.title = element_text(size=30, face = "bold", hjust=0.5),
+                    axis.title = element_text(size=25,face = "bold"),
+                    axis.text=element_text(size=20, face = "bold"))
+## import data from data source 1
+
+pew.data <- read.spss("ATP W32.sav", to.data.frame=TRUE)
+
+## transfer data into tibble
+
+pew.data <- as_tibble(pew.data) 
+
+## check names of pew data
+names(pew.data) 
+
+## 6,251 people took the survey
+
+dim(pew.data) 
+
+## For Weight, there are two weights in the W32 dataset.
+## WEIGHT_W32 is the weight for the entire sample. Data for most Pew Research Center reports are analyzed using this weight.
+## WEIGHT_W32_ATP is the weight for only the ATP sample (as indicated by variable KP_W32=0). This weight is used for questions MISINFG and MISINFT.
+
+## So here, I use WEIGHT_W32 to do uncertainty measurement.
+
+## check weights
+
+pew.data$WEIGHT_W32[1:10] 
+
+# weights also sum up to 6,251, which is the number of people who took the survey
+
+sum(pew.data$WEIGHT_W32)
+
+# weights are positive (i.e. not negative or zero)
+
+all(pew.data$WEIGHT_W32 > 0) 
+
+
+pew.design <- svydesign(ids=~1, 
+                        weights=~WEIGHT_W32, 
+                        data=pew.data)
+```
+
+
+```{r,include=FALSE}
+
+## Data Source 2
+insurance.newdata <- read_delim("ACS_17_1YR_DP03_with_ann.csv",col_names=TRUE, delim=",", skip=1)
+
+insurance.newdata <- insurance.newdata %>%
+  rename(EmployedInsuranceCover = "Estimate; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Employed: - With health insurance coverage",
+         MarginEmployedInsuranceCover = "Margin of Error; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Employed: - With health insurance coverage",
+         PercentEmployedInsuranceCover = "Percent; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Employed: - With health insurance coverage",
+         MarginPercentEmployedInsuranceCover= "Percent Margin of Error; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Employed: - With health insurance coverage",
+         UnemployedInsuranceCover = "Estimate; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Unemployed: - With health insurance coverage",
+         MarginUnemployedInsuranceCover = "Margin of Error; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Unemployed: - With health insurance coverage",
+         PercentUnemployedInsuranceCover = "Percent; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Unemployed: - With health insurance coverage",
+         MarginPercentUnemployedInsuranceCover = "Percent Margin of Error; HEALTH INSURANCE COVERAGE - Civilian noninstitutionalized population 19 to 64 years - In labor force: - Unemployed: - With health insurance coverage") %>%
+  select(EmployedInsuranceCover,MarginEmployedInsuranceCover,PercentEmployedInsuranceCover,MarginPercentEmployedInsuranceCover,UnemployedInsuranceCover,MarginUnemployedInsuranceCover,PercentUnemployedInsuranceCover,MarginPercentUnemployedInsuranceCover)
+
+insurance.newdata
+
+insurance.newtable<-data.frame(NumberofInsuranceCover = c(insurance.newdata$EmployedInsuranceCover,insurance.newdata$UnemployedInsuranceCover), MarginInsuranceCover = c(insurance.newdata$MarginEmployedInsuranceCover,insurance.newdata$MarginUnemployedInsuranceCover), PercentInsuranceCover = c(insurance.newdata$PercentEmployedInsuranceCover,insurance.newdata$PercentUnemployedInsuranceCover),PercentMarginInsuranceCover = c(insurance.newdata$MarginPercentEmployedInsuranceCover,insurance.newdata$MarginPercentUnemployedInsuranceCover), People = c("Employed","Unemployed"))
+
+```
+
+
+```{r tab1,echo=FALSE,warning = FALSE,error = FALSE,message = FALSE,out.width = '70%'}
+LifeSatisfictionPercent<-data.frame(round(svymean(~SATLIFEA_W32, design=pew.design), digits = 3))
+#LifeSatisfictionNumber<-data.frame(round(svytotal(~SATLIFEA_W32, design=pew.design),digits = 3))
+FinancialConditionPercent<-data.frame(round(svymean(~SATLIFEC_W32, design=pew.design),digits = 3))
+#FinancialConditionNumber<-data.frame(round(svytotal(~SATLIFEC_W32, design=pew.design),digits = 3))
+
+
+table5<-data.frame(LifeSatisfictionPercent$mean,FinancialConditionPercent$mean)
+row.names(table5) <- c("Very satisfied","Somewhat satisfied","Somewhat dissatisfied","Very dissatisfied","Refused")
+kable(table5,format = "pandoc",align='c')
+
+```
+
+
+From this survey, the overall target population for Wave 32 was non-institutionalized persons age 18 and over, living in the US, including Alaska and Hawaii. The sample consisted of 5,497 members of the ATP(American Trends Panel) and 2,499 members of KP(KnowledgePanel). In this case, this is the sample data not the population data. For this survey, this weight is not equal weighted and the weight is been set and different based on gender and age.
+
+*Weighting and survey design features that depart from simple random sampling tend to result in an increase in the variance of survey estimates. This increase, known as the design effect or deff, should be incorporated into the margin of error, standard errors, and tests of statistical significance. The overall design effect for a survey is commonly approximated as 1 plus the squared coefficient of variation of the weights. For this survey, the margin of error (half-width of the 95% confidence interval) incorporating the design effect for full sample estimates at 50% is ± 1.90 percentage points. Estimates based on subgroups will have larger margins of error. (Pew Research Center’s American Trends Panel Wave 32 Methodology Report)*。
+
+```{r,include=FALSE,echo=FALSE,warning = FALSE,error = FALSE,message = FALSE}
+```
+
+**3. Visualizations**
+```{r,include=FALSE}
+nrow(pew.design)
+sum(svytotal(~SATLIFEA_W32, design=pew.design))
+
+svytable(~SATLIFEA_W32 + SATLIFEB_W32, design=pew.design) %>%
+  as_tibble()
+
+# total of all cells = 2,537
+svytable(~SATLIFEA_W32 + SATLIFEC_W32, design=pew.design) %>%
+  as_tibble() %>%
+  summarize(sum(n))
+```
+
+```{r,echo=FALSE,warning = FALSE,error = FALSE,message = FALSE,fig.width=12, fig.height=8}
+## Bar Graph:
+
+svymean(~SATLIFEA_W32, design=pew.design) %>%
+  as_tibble(rownames="response") %>%
+  mutate(response = substr(response, start=13, stop=nchar(response)),
+         percent = mean*100) %>%
+  
+  mutate(response = factor(response, levels=c("Very satisfied","Somewhat satisfied", "Somewhat dissatisfied","Very dissatisfied","Refused"))) %>%ggplot(aes(x=response, y=percent)) +
+  geom_col(fill=c("#663A44", "#5F7880", "#CAA78D", 	"#2F4F4F","993333")) +
+  ggtitle("How People Satisfied with their Family Life") +
+  labs(x="", y = "percent (%)")+
+  theme(axis.text.x = element_text(angle = 30,hjust = 1,vjust = 1))+
+  theme.info
+
+
+```
+
+```{r,echo=FALSE,warning = FALSE,error = FALSE,message = FALSE,fig.width=20, fig.height=15}
+# Mosaic Grap
+
+svytable(~SATLIFEA_W32 + SATLIFEC_W32, design=pew.design) %>%
+  as_tibble() %>%
+  ggplot() +
+  geom_mosaic(aes(x=product(SATLIFEA_W32,SATLIFEC_W32), 
+                  weight=n, fill=SATLIFEA_W32)) +
+  scale_fill_viridis_d() +  
+  ggtitle("Personal Financial Satisfaction Related to Family Satifaction") +
+  labs(x="Satisfaction of Family Life",
+       y="Satisfaction of Personal Financial Situation") +
+  theme.info + theme(legend.position = "none", 
+                     panel.grid.major=element_blank(),
+                     axis.text.x = element_text(angle=45, hjust=1))
+```
+
+
+From above mosaic plot, we can see that people who very satisfied with their personal financial situation are also contribute largest part in people who very satisfied with their family life. This is so called the economic base determines the superstucture constitute. 
+
+
+
+
+```{r,echo=FALSE,warning = FALSE,error = FALSE,message = FALSE,fig.width=12, fig.height=8}
+
+insurance.newtable %>%
+  ggplot(aes(x=People, y=PercentInsuranceCover)) +
+  geom_col(fill="#663A44") +
+  geom_errorbar(aes(ymin=PercentInsuranceCover-PercentMarginInsuranceCover, ymax=PercentInsuranceCover+PercentMarginInsuranceCover),
+                width=0.3) +
+  ggtitle("Percent of Labor Force Coverd by Health Insurance") +
+  labs(y="percentage %", x="") +
+  theme.info + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+insurance.newtable %>% 
+  ggplot(aes(x=People, y=PercentInsuranceCover)) +
+  geom_errorbar(aes(ymin=PercentInsuranceCover-PercentMarginInsuranceCover, ymax=PercentInsuranceCover+PercentMarginInsuranceCover),
+                width=0.3, col="#663A44", size=2) +
+  ggtitle("Confidence Intervel of Labor Force Covered by Health Insurance") +
+  labs(y="percentage %", x="") +
+  theme.info + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+From above Bar Plot, People employed have higher percentage in health insurance coverage, cause the company larger than 50 people required to provide health insurance to their employees.As of January 1, 2015, employers with 50 or more full time equivalent (FTE) employees are required to provide health coverage to full-time employees or else pay a tax penalty. This is commonly referred to as the employer mandate.(Does My Employer Have to Provide Health Insurance?https://www.peoplekeep.com/blog/bid/289948/does-my-employer-have-to-provide-health-insurance). Also, from confidence interval plot, we can see that people unemployed have larger intervel than people employed in health insurance converage. In this case, if people have a full time job in a middle company, he/she would have a well health care in a large degree. 
+
+```{r,include=FALSE}
+
+insurance.data <- read_delim("ACS_17_1YR_B27015_with_ann.csv",col_names=TRUE, delim=",", skip=1)
+
+insurance.data <- insurance.data %>%
+  rename(geo = "Geography",
+         "Under $25,000" = "Estimate; Under $25,000: - With health insurance coverage",
+         "Error Under $25,000" = "Margin of Error; Under $25,000: - With health insurance coverage",
+         "In $25,000 to $49,999" = "Estimate; $25,000 to $49,999: - With health insurance coverage",
+         "Error $25,000 to $49,999" = "Margin of Error; $25,000 to $49,999: - With health insurance coverage",
+         "In $50,000 to $74,999" = "Estimate; $50,000 to $74,999: - With health insurance coverage",
+         "Error 50,000 to $74,999" = "Margin of Error; $50,000 to $74,999: - With health insurance coverage",
+         "In $75,000 to $99,999" = "Estimate; $75,000 to $99,999: - With health insurance coverage",
+         "Error $75,000 to $99,999" = "Margin of Error; $75,000 to $99,999: - With health insurance coverage",
+         "Over $100,000" = "Estimate; $100,000 or more: - With health insurance coverage",
+         "Error Over $100,000" = "Margin of Error; $100,000 or more: - With health insurance coverage") %>%
+  select(geo, "Under $25,000","Error Under $25,000","In $25,000 to $49,999","Error $25,000 to $49,999","In $50,000 to $74,999","Error 50,000 to $74,999", "In $75,000 to $99,999","Error $75,000 to $99,999","Over $100,000","Error Over $100,000")
+
+insurance.data
+
+insurance.table<-data.frame(People = c(insurance.data$`Under $25,000`,insurance.data$`In $25,000 to $49,999`,insurance.data$`In $50,000 to $74,999`,insurance.data$`In $75,000 to $99,999`,insurance.data$`Over $100,000`), Error = c(insurance.data$`Error Under $25,000`,insurance.data$`Error $25,000 to $49,999`,insurance.data$`Error 50,000 to $74,999`,insurance.data$`Error $75,000 to $99,999`,insurance.data$`Error Over $100,000`),Income = c("Under $25,000","In $25,000 to $49,999","In $50,000 to $74,999","In $75,000 to $99,999","Over $100,000"))
+
+insurance.table$Percent <- insurance.table$Error/insurance.table$People
+insurance.table
+```
+
+```{r,echo=FALSE,warning = FALSE,error = FALSE,message = FALSE,fig.width=12, fig.height=8}
+insurance.table%>% mutate(Income = factor(Income, levels=c("Under $25,000","In $25,000 to $49,999","In $50,000 to $74,999","In $75,000 to $99,999","Over $100,000"))) %>%
+  ggplot(aes(x=Income, y=People)) +
+  geom_col(fill="#663A44") +
+  geom_errorbar(aes(ymin=People-Error, ymax=People+Error),
+                width=0.3) +
+  ggtitle("People Covered by Health Insurance at Household Income Scale") +
+  labs(y="Population", x="") +
+  theme.info + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# 
+# insurance.table  %>%
+#   ggplot(aes(x=Income, y=Percent)) +
+#   geom_errorbar(aes(ymin=People-Error, ymax=People+Error),
+#                 width=0.1, col="firebrick", size=1) +
+#   ggtitle("Percent of People 25 and Over with Bachelor's\nDegrees Who Majored in Science or Engineering") +
+#   labs(y="percentage, %", x="") +
+#   theme.info + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+From above bar plot, it shows how many people been covered by each family income scale. We can see that people covered by health insurance in family income over **$100,000/yr** at the largest amount, however, this may cause by family income over **$100,000/yr** is at the largest part.But also, it may because people at the family yearly income higher than **$100,000/yr** would happy to pay more or extra to be covered at health insurance.
+
+
+**4. Limitations**
+
+1) Data Limitation: without data of people in how value their financial condition and life satisfition based on employed or unemployed condition, we cannot provide a specific result about whether employed or unemployed really affect people's view of their happiness and satisfiction of financial condition.For our data above, we can only know, higher income family would be more covered by medical insurance, in this case, they may more satisfied of their life. We also need more data such as people with different income scale how their value their family life and then, we can know whether people would be more satisfied with their life with higher income since level of satisfiction of financial condition is difficult to quantify. Additional, we also need data of how people value health insurance to the satisfiction of their life especially when they get illness. 
+
+
+2) Sample Data Limitation: Our survey is based on the sample data, which may not represent the population and may not represent the whole United States. For example, people live in New York City and California may have different income scale to middle states, which may affect the total result or make part of data unsignificant. 
+
+
+
+**5. References**
+
+(1) Christina Merhar "Does My Employer Have to Provide Health Insurance?"
+https://www.peoplekeep.com/blog/bid/289948/does-my-employer-have-to-provide-health-insurance
+
+(2) American Community Survey B27015 HEALTH INSURANCE COVERAGE STATUS AND TYPE BY HOUSEHOLD INCOME IN THE PAST 12 MONTHS (IN 2017 INFLATION-ADJUSTED DOLLARS)
+https://factfinder.census.gov
+
+(3) American Community Survey DP03 SELECTED ECONOMIC CHARACTERISTICS
+(U.S. Census Bureau, 2013-2017 American Community Survey 1-Year Estimates)
+https://factfinder.census.gov
+
+(4) Pew Research Center Wave 32 American Trends Panel 
+Dates: February 26-March 11, 2018
+https://www.pewresearch.org/
